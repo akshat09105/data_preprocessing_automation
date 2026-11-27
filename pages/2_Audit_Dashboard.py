@@ -54,7 +54,7 @@ if "audit_report" not in st.session_state or st.session_state["audit_report"] is
     c1, c2, c3 = st.columns([1, 1, 1])
     with c2:
         if st.button("⬅️ Return to Ingestion Portal", type="primary", use_container_width=True):
-            st.switch_page("app.py")
+            st.switch_page("pages/1_Run_Audit.py")
     st.stop()
 
 report = st.session_state["audit_report"]

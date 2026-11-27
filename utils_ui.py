@@ -1,6 +1,6 @@
 """
 Shared UI Utilities and Cyber-Detective Theming Helpers.
-Injected across Home, Audit Dashboard, and Benchmark Insights.
+Injected across About, Run Audit, Audit Dashboard, and Benchmark Insights.
 """
 
 from pathlib import Path
@@ -34,8 +34,9 @@ def render_disclaimer_banner() -> None:
             <span class="disclaimer-icon">🛡️</span>
             <div>
                 <strong>Conservative Forensics Principle:</strong>
-                All detected findings are suspicious candidates flagged for <em>human domain review</em>,
-                never confirmed errors. The system never automatically deletes, relabels, or corrupts data.
+                All findings are suspicious candidates for human review, not confirmed errors.
+                Anomalies can be valid rare events. High feature importance alone does not prove leakage.
+                This tool never deletes or relabels data automatically.
             </div>
         </div>
         """,
@@ -44,7 +45,7 @@ def render_disclaimer_banner() -> None:
 
 
 def render_sidebar_branding() -> None:
-    """Renders clean cyber-detective branding and status in the sidebar."""
+    """Renders clean cyber-detective branding and navigation guide in the sidebar."""
     with st.sidebar:
         st.markdown(
             """
@@ -52,8 +53,8 @@ def render_sidebar_branding() -> None:
                 <div style="font-family: 'Space Grotesk', sans-serif; font-size: 1.35rem; font-weight: 700; color: #00f0ff; letter-spacing: -0.02em;">
                     🕵️‍♂️ DATA DETECTIVE
                 </div>
-                <div style="font-size: 0.75rem; color: #94a3b8; font-family: 'Inter', sans-serif;">
-                    Classical ML Tabular Quality Auditing
+                <div style="font-size: 0.75rem; color: #94a3b8; font-family: 'Inter', sans-serif; margin-bottom: 0.5rem;">
+                    Classical ML Tabular Data Forensics
                 </div>
             </div>
             """,
