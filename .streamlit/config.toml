@@ -1,12 +1,12 @@
 [client]
-showSidebarNavigation = true
+showSidebarNavigation = false
 
 [theme]
-base = "dark"
-primaryColor = "#00f0ff"
-backgroundColor = "#07090e"
-secondaryBackgroundColor = "#0f172a"
-textColor = "#f8fafc"
+base = "light"
+primaryColor = "#2563eb"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f172a"
 font = "sans serif"
 
 [server]
