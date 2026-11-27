@@ -1,560 +1,349 @@
 """
-DATA DETECTIVE - Streamlit Web Application.
-Classical ML Data Quality & Defect Detection System.
+DATA DETECTIVE - Home & Ingestion Portal (app.py).
+Cyber-Detective Theme: Modern dark canvas, neon cyan/violet accents,
+interactive stepper, CSV upload, configuration & audit execution.
 """
 
 import io
-import json
-import os
 from pathlib import Path
 import time
 from typing import Optional
 
-import numpy as np
 import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 from detective.engine import run_all
-from detective.report import (
-    export_master_queue_csv,
-    export_to_excel,
-    export_to_json,
-    generate_recommendations,
-)
+from utils_ui import load_cyber_theme, render_disclaimer_banner, render_sidebar_branding
 
-# Page configuration
+# Configure page
 st.set_page_config(
-    page_title="Data Detective | Classical ML Data Audit",
+    page_title="Data Detective | Home & Forensics Ingestion",
     page_icon="🕵️‍♂️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS styling
-st.markdown(
-    """
-    <style>
-    .main-header {
-        font-size: 2.2rem;
-        font-weight: 700;
-        color: #1E3A8A;
-        margin-bottom: 0.2rem;
-    }
-    .sub-header {
-        font-size: 1.05rem;
-        color: #4B5563;
-        margin-bottom: 1.5rem;
-    }
-    .metric-card {
-        background-color: #F8FAFC;
-        border: 1px solid #E2E8F0;
-        border-radius: 8px;
-        padding: 16px;
-        text-align: center;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    .severity-badge-high {
-        background-color: #FEE2E2;
-        color: #991B1B;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        display: inline-block;
-    }
-    .severity-badge-med {
-        background-color: #FEF3C7;
-        color: #92400E;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        display: inline-block;
-    }
-    .severity-badge-clean {
-        background-color: #DCFCE7;
-        color: #166534;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-weight: 600;
-        display: inline-block;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# Apply global Cyber-Detective CSS Theme
+load_cyber_theme()
+render_sidebar_branding()
 
 
 @st.cache_data
-def load_csv_data(file_bytes) -> pd.DataFrame:
-    """Cached loader for uploaded CSV bytes."""
+def load_csv_bytes(file_bytes: bytes) -> pd.DataFrame:
+    """Cached CSV byte parser."""
     return pd.read_csv(io.BytesIO(file_bytes))
 
 
 def main():
-    st.markdown("<div class='main-header'>🕵️‍♂️ DATA DETECTIVE</div>", unsafe_allow_html=True)
+    # ------------------ HERO SECTION ------------------
     st.markdown(
-        "<div class='sub-header'>Classical ML Audit System for Hidden Tabular Defects: "
-        "Duplicates, Target Leakage, Label Errors, and Anomalies.</div>",
+        """
+        <div class="hero-container">
+            <span class="hero-badge">⚡ Classical ML Forensic Intelligence</span>
+            <h1 class="hero-title">DATA DETECTIVE</h1>
+            <p class="hero-subtitle">
+                Automated tabular quality auditor. Detects hidden data defects—<strong>exact & conflicting duplicates</strong>,
+                <strong>target leakage</strong>, <strong>out-of-fold label errors</strong>, and <strong>multidimensional anomalies</strong>—with
+                mathematical evidence and zero black-box neural networks.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    render_disclaimer_banner()
+
+    # Determine current step
+    has_data = "df" in st.session_state and st.session_state["df"] is not None
+    has_audit = "audit_report" in st.session_state and st.session_state["audit_report"] is not None
+
+    current_step = 3 if has_audit else (2 if has_data else 1)
+
+    # ------------------ STEPPER ------------------
+    st.markdown(
+        f"""
+        <div class="stepper-container">
+            <div class="step-item {'active' if current_step >= 1 else 'inactive'}">
+                <div class="step-number">1</div>
+                <div class="step-text">
+                    <span class="step-title">Ingest Data</span>
+                    <span class="step-desc">Upload CSV or load sample</span>
+                </div>
+            </div>
+            <div class="step-item {'active' if current_step >= 2 else 'inactive'}">
+                <div class="step-number">2</div>
+                <div class="step-text">
+                    <span class="step-title">Configure Targets</span>
+                    <span class="step-desc">Select column roles & thresholds</span>
+                </div>
+            </div>
+            <div class="step-item {'active' if current_step >= 3 else 'inactive'}">
+                <div class="step-number">3</div>
+                <div class="step-text">
+                    <span class="step-title">Audit & Forensics</span>
+                    <span class="step-desc">Inspect findings on dashboard</span>
+                </div>
+            </div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
     # ------------------ SIDEBAR CONTROLS ------------------
-    st.sidebar.title("🔍 Audit Settings")
+    st.sidebar.markdown("### 🎛️ Quick Presets")
 
-    # Demo dataset option
     demo_path = Path(__file__).resolve().parent / "data" / "demo_dataset_corrupted.csv"
-    load_demo = False
-    if demo_path.exists():
-        if st.sidebar.button("⚡ Load Pre-corrupted Demo Dataset", use_container_width=True):
-            st.session_state["uploaded_file_data"] = demo_path.read_bytes()
-            st.session_state["filename"] = "demo_dataset_corrupted.csv"
-            load_demo = True
+    cancer_path = Path(__file__).resolve().parent / "data" / "breast_cancer.csv"
+    titanic_path = Path(__file__).resolve().parent / "data" / "titanic.csv"
 
-    uploaded_file = st.sidebar.file_uploader(
-        "Upload Tabular Dataset (CSV)", type=["csv"], help="Upload any CSV file to inspect."
+    if st.sidebar.button("⚡ Load Pre-corrupted Demo Dataset", use_container_width=True):
+        if demo_path.exists():
+            demo_df = pd.read_csv(demo_path)
+            st.session_state["df"] = demo_df
+            st.session_state["dataset_name"] = "demo_dataset_corrupted.csv"
+            st.session_state["target_col"] = "survived"
+            st.session_state["id_col"] = "passenger_id"
+            st.rerun()
+
+    sample_choice = st.sidebar.selectbox(
+        "Or Select a Benchmark Dataset",
+        options=["Select preset...", "Breast Cancer (Clean)", "Titanic Demographics", "Wine Quality"],
     )
-
-    # Secondary optional holdout set
-    uploaded_test_file = st.sidebar.file_uploader(
-        "Optional: Upload Evaluation / Test CSV",
-        type=["csv"],
-        help="Checks for exact train-test row leakage/overlap.",
-    )
-
-    if uploaded_file is not None:
-        st.session_state["uploaded_file_data"] = uploaded_file.getvalue()
-        st.session_state["filename"] = uploaded_file.name
-
-    if "uploaded_file_data" not in st.session_state:
-        st.info("👋 Upload a CSV file in the sidebar or click **'Load Pre-corrupted Demo Dataset'** to begin.")
-        return
-
-    # Load dataframe
-    try:
-        df = load_csv_data(st.session_state["uploaded_file_data"])
-    except Exception as e:
-        st.error(f"Error parsing CSV file: {e}")
-        return
-
-    test_df = None
-    if uploaded_test_file is not None:
-        try:
-            test_df = load_csv_data(uploaded_test_file.getvalue())
-        except Exception:
-            test_df = None
-
-    total_rows, total_cols = df.shape
-    if total_rows > 10000:
-        st.sidebar.warning(f"Large dataset detected ({total_rows:,} rows). Consider sampling for faster audit.")
-
-    # Target Column Selector
-    columns = list(df.columns)
-    # Heuristic default target
-    default_target_idx = 0
-    for idx, c in enumerate(columns):
-        c_lower = c.lower()
-        if any(term in c_lower for term in ["target", "label", "survived", "diagnosis", "class", "outcome", "status"]):
-            default_target_idx = idx
-            break
-
-    target_col = st.sidebar.selectbox(
-        "Select Target Column",
-        options=columns,
-        index=default_target_idx,
-        help="The dependent variable to audit against for leakage, label errors, and duplicates.",
-    )
-
-    # Optional ID Column
-    id_candidates = ["None"] + columns
-    default_id_idx = 0
-    for idx, c in enumerate(columns):
-        if any(term in c.lower() for term in ["id", "uuid", "passenger", "key", "index"]):
-            default_id_idx = idx + 1
-            break
-
-    selected_id_option = st.sidebar.selectbox(
-        "Select Primary Key / ID Column (Optional)",
-        options=id_candidates,
-        index=default_id_idx,
-        help="Excluded from models but audited for duplicate repeats.",
-    )
-    id_col = None if selected_id_option == "None" else selected_id_option
-
-    # Anomaly Contamination Slider
-    contamination = st.sidebar.slider(
-        "Anomaly Expected Contamination",
-        min_value=0.01,
-        max_value=0.20,
-        value=0.05,
-        step=0.01,
-        help="Estimated upper-bound proportion of statistical anomalies.",
-    )
+    if sample_choice == "Breast Cancer (Clean)" and cancer_path.exists():
+        if st.sidebar.button("Load Breast Cancer", use_container_width=True):
+            st.session_state["df"] = pd.read_csv(cancer_path)
+            st.session_state["dataset_name"] = "breast_cancer.csv"
+            st.session_state["target_col"] = "diagnosis"
+            st.session_state["id_col"] = None
+            st.rerun()
+    elif sample_choice == "Titanic Demographics" and titanic_path.exists():
+        if st.sidebar.button("Load Titanic", use_container_width=True):
+            st.session_state["df"] = pd.read_csv(titanic_path)
+            st.session_state["dataset_name"] = "titanic.csv"
+            st.session_state["target_col"] = "survived"
+            st.session_state["id_col"] = "passenger_id" if "passenger_id" in st.session_state["df"].columns else None
+            st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Detection Modules")
-    chk_duplicates = st.sidebar.checkbox("Exact & Conflicting Duplicates", value=True)
-    chk_leakage = st.sidebar.checkbox("Target Leakage Detection", value=True)
-    chk_label_errors = st.sidebar.checkbox("OOF Cross-Validation Label Errors", value=True)
-    chk_anomalies = st.sidebar.checkbox("IsolationForest & PCA Anomalies", value=True)
+    st.sidebar.markdown(
+        """
+        <div style="font-size: 0.8rem; color: #64748b; line-height: 1.4;">
+            <strong>Pages:</strong><br/>
+            • <code>Home / Ingestion</code> (Current)<br/>
+            • <code>1_Audit_Dashboard</code><br/>
+            • <code>2_Benchmark_Insights</code>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    run_btn = st.sidebar.button("🚀 Run Audit", type="primary", use_container_width=True)
+    # ------------------ STEP 1: FILE INGESTION ------------------
+    col_up1, col_up2 = st.columns([1.8, 1.2])
 
-    # Trigger audit execution
-    if run_btn or "last_report" not in st.session_state:
-        with st.spinner("🕵️‍♂️ Running Classical ML Data Audit across all detectors..."):
-            options = {
-                "enable_duplicates": chk_duplicates,
-                "enable_leakage": chk_leakage,
-                "enable_label_errors": chk_label_errors,
-                "enable_anomalies": chk_anomalies,
+    with col_up1:
+        st.markdown("### 📥 Step 1: Upload Tabular Dataset")
+        uploaded_file = st.file_uploader(
+            "Drop your primary CSV dataset here",
+            type=["csv"],
+            help="Supports any standard comma-separated tabular dataset.",
+        )
+
+        if uploaded_file is not None:
+            try:
+                raw_bytes = uploaded_file.getvalue()
+                df_loaded = load_csv_bytes(raw_bytes)
+                st.session_state["df"] = df_loaded
+                st.session_state["dataset_name"] = uploaded_file.name
+                st.success(f"Loaded `{uploaded_file.name}` ({len(df_loaded):,} rows × {len(df_loaded.columns)} columns)")
+            except Exception as e:
+                st.error(f"Error reading uploaded CSV: {e}")
+
+    with col_up2:
+        st.markdown("### 🧪 Optional Evaluation Set")
+        uploaded_test = st.file_uploader(
+            "Optional: Upload Holdout / Test CSV",
+            type=["csv"],
+            help="Checks for exact train-test row leakage/overlap across datasets.",
+        )
+        if uploaded_test is not None:
+            try:
+                st.session_state["test_df"] = load_csv_bytes(uploaded_test.getvalue())
+                st.info(f"Loaded test holdout set ({len(st.session_state['test_df']):,} rows)")
+            except Exception:
+                st.session_state["test_df"] = None
+        else:
+            if "test_df" not in st.session_state:
+                st.session_state["test_df"] = None
+
+    # Check if dataset is ready
+    current_df = st.session_state.get("df")
+    if current_df is None:
+        st.markdown(
+            """
+            <div class="cyber-card" style="text-align: center; padding: 2.5rem; margin-top: 1.5rem;">
+                <h4 style="color: #94a3b8;">No Dataset Loaded</h4>
+                <p style="color: #64748b; font-size: 0.9rem;">
+                    Upload a CSV above or click <strong>'⚡ Load Pre-corrupted Demo Dataset'</strong> in the sidebar for an instant walkthrough.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        return
+
+    # ------------------ STEP 2: CONFIGURATION ------------------
+    st.markdown("---")
+    st.markdown("### ⚙️ Step 2: Configure Audit Parameters")
+
+    cols = list(current_df.columns)
+
+    # Heuristic target guess
+    default_target_idx = 0
+    saved_target = st.session_state.get("target_col")
+    if saved_target and saved_target in cols:
+        default_target_idx = cols.index(saved_target)
+    else:
+        for idx, c in enumerate(cols):
+            c_low = c.lower()
+            if any(term in c_low for term in ["target", "label", "survived", "diagnosis", "class", "outcome", "status"]):
+                default_target_idx = idx
+                break
+
+    # Heuristic ID guess
+    id_candidates = ["None"] + cols
+    default_id_idx = 0
+    saved_id = st.session_state.get("id_col")
+    if saved_id and saved_id in cols:
+        default_id_idx = id_candidates.index(saved_id)
+    else:
+        for idx, c in enumerate(cols):
+            c_low = c.lower()
+            if any(term in c_low for term in ["id", "uuid", "passenger", "key", "index", "pk"]):
+                default_id_idx = idx + 1
+                break
+
+    c_conf1, c_conf2, c_conf3 = st.columns(3)
+
+    with c_conf1:
+        selected_target = st.selectbox(
+            "Target Column (Dependent Variable)",
+            options=cols,
+            index=default_target_idx,
+            help="Used for target leakage, out-of-fold label error, and conflicting label checks.",
+        )
+        st.session_state["target_col"] = selected_target
+
+    with c_conf2:
+        selected_id = st.selectbox(
+            "Primary Key / ID Column (Optional)",
+            options=id_candidates,
+            index=default_id_idx,
+            help="Excluded from machine learning features but audited for key duplicate repeats.",
+        )
+        st.session_state["id_col"] = None if selected_id == "None" else selected_id
+
+    with c_conf3:
+        contamination = st.slider(
+            "Anomaly Expected Contamination",
+            min_value=0.01,
+            max_value=0.20,
+            value=0.05,
+            step=0.01,
+            help="Estimated upper-bound proportion of statistical outliers.",
+        )
+
+    # Detection module toggles
+    with st.expander("🛠️ Advanced Module Configuration", expanded=False):
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            enable_dups = st.checkbox("Exact & Conflicting Duplicates", value=True)
+        with m2:
+            enable_leak = st.checkbox("Multi-Evidence Target Leakage", value=True)
+        with m3:
+            enable_labels = st.checkbox("OOF Cross-Validation Label Errors", value=True)
+        with m4:
+            enable_anom = st.checkbox("Ensemble Anomalies (IsoForest + PCA + LOF)", value=True)
+
+    # Preview Dataset Head
+    with st.expander("👁️ Preview Dataset Sample (Top 5 Rows)", expanded=False):
+        st.dataframe(current_df.head(5), use_container_width=True)
+
+    # ------------------ STEP 3: RUN AUDIT ------------------
+    st.markdown("---")
+    st.markdown("### 🚀 Step 3: Execute Classical ML Audit")
+
+    col_btn1, col_btn2 = st.columns([1.5, 2.5])
+
+    with col_btn1:
+        run_audit_clicked = st.button("RUN FORENSIC AUDIT", type="primary", use_container_width=True)
+
+    if run_audit_clicked:
+        with st.status("🕵️‍♂️ Running Classical ML Audit Pipeline...", expanded=True) as status:
+            progress_bar = st.progress(10)
+            st.write("1/4: Analyzing column roles, types, and building imputation/scaling pipelines...")
+            time.sleep(0.15)
+            progress_bar.progress(30)
+
+            st.write("2/4: Auditing exact and conflicting label duplicate pairs...")
+            time.sleep(0.15)
+            progress_bar.progress(55)
+
+            st.write("3/4: Training shallow tree CVs, permutation importance & score-drop delta tests...")
+            time.sleep(0.15)
+            progress_bar.progress(75)
+
+            st.write("4/4: Computing OOF cross-validation probabilities, Cleanlab issues & multidimensional anomaly scores...")
+
+            audit_options = {
+                "enable_duplicates": enable_dups,
+                "enable_leakage": enable_leak,
+                "enable_label_errors": enable_labels,
+                "enable_anomalies": enable_anom,
                 "contamination": contamination,
                 "random_state": 42,
             }
+
             report = run_all(
-                df=df,
-                target_col=target_col,
-                id_col=id_col,
-                test_df=test_df,
-                options=options,
-            )
-            st.session_state["last_report"] = report
-            st.session_state["last_df"] = df
-
-    report = st.session_state.get("last_report")
-    if not report:
-        return
-
-    summary = report.get("summary", {})
-    health_score = summary.get("data_health_score", 100)
-    overall_sev = summary.get("overall_severity", "Clean")
-
-    # ------------------ TOP METRIC CARDS ------------------
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
-    with col1:
-        st.metric("Health Score", f"{health_score}/100")
-    with col2:
-        st.metric("Total Rows", f"{len(df):,}")
-    with col3:
-        st.metric("Exact Duplicates", f"{summary.get('total_duplicates', 0)}")
-    with col4:
-        st.metric("Leakage Suspects", f"{summary.get('leakage_suspects', 0)}")
-    with col5:
-        st.metric("Label Issues", f"{summary.get('label_issue_candidates', 0)}")
-    with col6:
-        st.metric("Anomalies", f"{summary.get('anomalies_flagged', 0)}")
-
-    st.markdown("---")
-
-    # ------------------ MAIN TABS ------------------
-    tab_overview, tab_dups, tab_leak, tab_labels, tab_anom, tab_master, tab_export = st.tabs(
-        [
-            "📋 Overview",
-            "👥 Duplicates",
-            "⚡ Target Leakage",
-            "🏷️ Label Review Queue",
-            "🌌 Anomalies",
-            "🚨 Master Review Queue",
-            "💾 Download & Export",
-        ]
-    )
-
-    # TAB 1: OVERVIEW
-    with tab_overview:
-        st.subheader("Dataset Health & Audit Summary")
-
-        # Severity banner
-        if overall_sev == "High":
-            st.markdown(
-                "<span class='severity-badge-high'>OVERALL SEVERITY: HIGH</span> - Action required before modeling.",
-                unsafe_allow_html=True,
-            )
-        elif overall_sev == "Medium":
-            st.markdown(
-                "<span class='severity-badge-med'>OVERALL SEVERITY: MEDIUM</span> - Multiple suspicious records need review.",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                "<span class='severity-badge-clean'>OVERALL SEVERITY: CLEAN</span> - Dataset is well conditioned.",
-                unsafe_allow_html=True,
+                df=current_df,
+                target_col=selected_target,
+                id_col=st.session_state.get("id_col"),
+                test_df=st.session_state.get("test_df"),
+                options=audit_options,
             )
 
-        # Action Recommendations
-        recs = generate_recommendations(report)
-        st.markdown("#### Action Recommendations")
-        for r in recs:
-            st.info(f"💡 {r}")
+            progress_bar.progress(100)
+            status.update(label="Audit Complete! Forensic findings ready.", state="complete", expanded=False)
 
-        # Data Profile Section
-        prof = report.get("data_profile", {})
-        if prof:
-            st.markdown("#### Data Profile & Types")
-            pcol1, pcol2 = st.columns(2)
-            with pcol1:
-                st.write(
-                    f"**Target Type:** `{prof.get('target_type')}` | **Target Column:** `{prof.get('target_col')}`"
-                )
-                st.write(
-                    f"**Numeric Features ({len(prof.get('num_cols', []))}):** {', '.join(prof.get('num_cols', [])) or 'None'}"
-                )
-                st.write(
-                    f"**Categorical Features ({len(prof.get('cat_cols', []))}):** {', '.join(prof.get('cat_cols', [])) or 'None'}"
-                )
-                st.write(
-                    f"**Identified ID Columns ({len(prof.get('id_cols', []))}):** {', '.join(prof.get('id_cols', [])) or 'None'}"
-                )
+            st.session_state["audit_report"] = report
 
-            with pcol2:
-                st.write(f"**Overall Missing Cells:** `{prof.get('overall_missing_pct', 0)}%`")
-                if prof.get("class_balance"):
-                    st.write("**Target Distribution:**")
-                    bal_df = pd.DataFrame(
-                        list(prof["class_balance"].items()), columns=["Class / Metric", "Value"]
-                    )
-                    st.dataframe(bal_df, hide_index=True, use_container_width=True)
+    # If audit has been run, display summary card with redirect to Dashboard
+    if "audit_report" in st.session_state and st.session_state["audit_report"] is not None:
+        rep = st.session_state["audit_report"]
+        health = rep["summary"]["data_health_score"]
+        sev = rep["summary"]["overall_severity"]
 
-        # Execution Performance
-        with st.expander("⏱️ Audit Execution Times"):
-            runtimes = report.get("runtimes_sec", {})
-            st.json(runtimes)
-
-    # TAB 2: DUPLICATES
-    with tab_dups:
-        st.subheader("Duplicates & Label Conflict Analysis")
-        dup_data = report.get("duplicates", {})
-
-        # Conflicting labels
-        conflicts = dup_data.get("conflicting_duplicates", {})
-        if conflicts.get("count", 0) > 0:
-            st.error(
-                f"🚨 **Found {conflicts['count']} rows with Conflicting Labels!** "
-                "These records share identical feature attributes but have different target outcomes."
-            )
-            for grp in conflicts.get("groups", []):
-                st.write(
-                    f"**{grp['conflict_group_id']}** (Rows: {grp['row_indices']}) - Distribution: `{grp['target_distribution']}`"
-                )
-                st.dataframe(df.loc[grp["row_indices"]], use_container_width=True)
-        else:
-            st.success("✅ No conflicting label duplicates found.")
-
-        st.markdown("---")
-
-        # Exact duplicates
-        exact_dups = dup_data.get("exact_duplicates", {})
-        if exact_dups.get("count", 0) > 0:
-            st.warning(f"⚠️ **Found {exact_dups['count']} exact duplicate rows.**")
-            st.dataframe(df.loc[exact_dups["row_indices"]], use_container_width=True)
-        else:
-            st.success("✅ No exact duplicate rows found.")
-
-        # Train / Test Overlap
-        overlap = dup_data.get("train_test_overlap", {})
-        if overlap.get("count", 0) > 0:
-            st.error(f"🚨 **Found {overlap['count']} rows overlapping between Train and Test CSVs!**")
-
-    # TAB 3: TARGET LEAKAGE
-    with tab_leak:
-        st.subheader("Target Leakage Detection")
-        leak_data = report.get("leakage", {})
-        suspects = leak_data.get("suspect_features", [])
-
-        if suspects:
-            # Bar chart of suspicion scores
-            leak_df = pd.DataFrame(suspects)
-            fig = px.bar(
-                leak_df,
-                x="suspicion_score",
-                y="feature",
-                orientation="h",
-                color="confidence",
-                color_discrete_map={"High": "#EF4444", "Medium": "#F59E0B", "Low": "#3B82F6"},
-                title="Feature Leakage Suspicion Scores",
-                labels={"suspicion_score": "Suspicion Score (0-1)", "feature": "Feature"},
-            )
-            fig.update_layout(yaxis={"categoryorder": "total ascending"}, height=350)
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Details table
-            st.markdown("#### Evidence & Recommendations")
-            for item in suspects:
-                badge_color = (
-                    "red" if item["confidence"] == "High" else "orange" if item["confidence"] == "Medium" else "blue"
-                )
-                with st.expander(f"📌 {item['feature']} - Score: {item['suspicion_score']} ({item['confidence']} Confidence)"):
-                    st.write(f"**Recommendation:** {item['recommendation']}")
-                    st.write("**Mathematical & Empirical Evidence:**")
-                    for ev in item.get("evidence", []):
-                        st.markdown(f"- {ev}")
-                    st.json(
-                        {
-                            "Single Feature DT Score": item["single_feature_score"],
-                            "Permutation Importance Share": item["permutation_importance"],
-                            "Score Drop Delta": item["score_drop_delta"],
-                        }
-                    )
-        else:
-            st.success("✅ No target leakage detected across mathematical & empirical checks.")
-
-    # TAB 4: LABEL ERRORS
-    with tab_labels:
-        st.subheader("Potential Label Errors Review Queue")
         st.markdown(
-            "Out-Of-Fold (OOF) cross-validation predictions compared against given labels using Cleanlab & confidence margins. "
-            "*Findings are suspicious candidates needing human review, never automatically relabeled.*"
-        )
-        label_data = report.get("label_errors", {})
-        review_q = label_data.get("review_queue", [])
-
-        if review_q:
-            q_df = pd.DataFrame(review_q)
-            st.dataframe(
-                q_df[
-                    [
-                        "row_index",
-                        "given_label",
-                        "suggested_label",
-                        "model_confidence",
-                        "given_label_confidence",
-                        "label_quality_score",
-                        "models_agree",
-                        "detected_by",
-                        "severity",
-                    ]
-                ],
-                use_container_width=True,
-                hide_index=True,
-            )
-
-            # Inspection view
-            selected_idx = st.selectbox(
-                "Inspect Row Attributes", options=[item["row_index"] for item in review_q]
-            )
-            st.dataframe(df.loc[[selected_idx]], use_container_width=True)
-        else:
-            msg = label_data.get("summary", {}).get("message", "No label issues flagged.")
-            st.info(f"ℹ️ {msg}")
-
-    # TAB 5: ANOMALIES
-    with tab_anom:
-        st.subheader("Multidimensional Anomaly Detection")
-        st.info(
-            "ℹ️ **Advisory:** Anomalies represent statistically rare patterns or unusual combinations. "
-            "They are candidates for human domain review, but may represent valid rare events."
-        )
-        anom_data = report.get("anomalies", {})
-        ranked_anom = anom_data.get("ranked_anomalies", [])
-
-        if ranked_anom:
-            scores = anom_data.get("all_scores", [])
-            if scores:
-                fig = px.histogram(
-                    x=scores,
-                    nbins=30,
-                    title="Anomaly Score Distribution",
-                    labels={"x": "Normalized Anomaly Score", "y": "Row Count"},
-                    color_discrete_sequence=["#6366F1"],
-                )
-                fig.add_vline(
-                    x=anom_data.get("threshold", 0.5),
-                    line_dash="dash",
-                    line_color="red",
-                    annotation_text="Anomaly Threshold",
-                )
-                fig.update_layout(height=300)
-                st.plotly_chart(fig, use_container_width=True)
-
-            st.markdown("#### Ranked Anomalous Rows with Explainability")
-            for item in ranked_anom[:15]:
-                with st.expander(
-                    f"Row {item['row_index']} - Anomaly Score: {item['anomaly_score']} ({item['severity']} Severity)"
-                ):
-                    st.write(f"**Primary Driver:** {item['primary_reason']}")
-                    st.write("**Top Contributing Feature Deviations:**")
-                    feat_contrib_df = pd.DataFrame(item["top_features"])
-                    st.dataframe(feat_contrib_df, hide_index=True, use_container_width=True)
-                    st.write("**Raw Row Values:**")
-                    st.dataframe(df.loc[[item["row_index"]]], use_container_width=True)
-        else:
-            st.success("✅ No statistical anomalies flagged above the threshold.")
-
-    # TAB 6: MASTER REVIEW QUEUE
-    with tab_master:
-        st.subheader("🚨 Master Review Queue")
-        st.markdown(
-            "Priority-ranked queue of rows flagged across **multiple detection modules** "
-            "(e.g., records flagged as both an anomaly and a conflicting label)."
-        )
-        master_q = report.get("master_review_queue", [])
-        if master_q:
-            master_df = pd.DataFrame(
-                [
-                    {
-                        "Row Index": item["row_index"],
-                        "Priority Score": item["priority_score"],
-                        "Severity": item["overall_severity"],
-                        "Flags Count": item["flag_count"],
-                        "Detected Reasons": item["reasons"],
-                    }
-                    for item in master_q
-                ]
-            )
-            st.dataframe(master_df, hide_index=True, use_container_width=True)
-
-            selected_master_idx = st.selectbox(
-                "Inspect Flagged Row in Context",
-                options=[item["row_index"] for item in master_q],
-                key="master_select",
-            )
-            st.dataframe(df.loc[[selected_master_idx]], use_container_width=True)
-        else:
-            st.success("✅ Master review queue is empty; no high-risk rows flagged.")
-
-    # TAB 7: DOWNLOAD & EXPORT
-    with tab_export:
-        st.subheader("💾 Export Audit Findings")
-        st.markdown(
-            "Download structured reports for compliance, stakeholder review, or automated preprocessing pipelines."
+            f"""
+            <div class="cyber-card cyber-card-accent" style="margin-top: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                    <div>
+                        <h3 style="margin-bottom: 0.25rem;">Audit Findings Ready for Review</h3>
+                        <p style="color: #94a3b8; margin: 0; font-size: 0.95rem;">
+                            Overall Health: <strong style="color: #00f0ff;">{health}/100</strong> | 
+                            Severity: <span class="badge-pill {'badge-high' if sev == 'High' else 'badge-med' if sev == 'Medium' else 'badge-clean'}">{sev}</span> | 
+                            Flagged Master Rows: <strong>{len(rep.get('master_review_queue', []))}</strong>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-        ecol1, ecol2, ecol3 = st.columns(3)
-
-        with ecol1:
-            st.markdown("#### 📊 Excel Workbook (.xlsx)")
-            st.write("Contains dedicated sheets: Summary, Recommendations, Duplicates, Leakage, Label_Review, Anomalies, and Data_Profile.")
-            excel_bytes = export_to_excel(report, df)
-            st.download_button(
-                label="📥 Download Excel Audit Workbook",
-                data=excel_bytes,
-                file_name="data_detective_audit_report.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-            )
-
-        with ecol2:
-            st.markdown("#### 📑 Flagged Rows Queue (.csv)")
-            st.write("Master review queue with priority scores and original row values joined.")
-            csv_str = export_master_queue_csv(report, df)
-            st.download_button(
-                label="📥 Download Master Review CSV",
-                data=csv_str,
-                file_name="flagged_review_queue.csv",
-                mime="text/csv",
-                use_container_width=True,
-            )
-
-        with ecol3:
-            st.markdown("#### 🤖 Machine Report (.json)")
-            st.write("Full structured JSON report including metrics, configuration, runtimes, and evidence.")
-            json_str = export_to_json(report)
-            st.download_button(
-                label="📥 Download JSON Audit Report",
-                data=json_str,
-                file_name="data_detective_report.json",
-                mime="application/json",
-                use_container_width=True,
-            )
+        c_go1, c_go2 = st.columns([1.5, 2.5])
+        with c_go1:
+            if st.button("👉 Open Forensic Audit Dashboard", type="primary", use_container_width=True):
+                st.switch_page("pages/1_Audit_Dashboard.py")
 
 
 if __name__ == "__main__":
