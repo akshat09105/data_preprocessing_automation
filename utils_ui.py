@@ -45,21 +45,32 @@ def render_disclaimer_banner() -> None:
 
 
 def render_sidebar_branding() -> None:
-    """Renders clean cyber-detective branding and navigation guide in the sidebar."""
+    """Renders cyber-detective branding and guaranteed multipage navigation in the sidebar."""
     with st.sidebar:
         st.markdown(
             """
-            <div style="padding: 0.5rem 0 1rem 0; text-align: left;">
+            <div style="padding: 0.25rem 0 0.85rem 0; text-align: left;">
                 <div style="font-family: 'Space Grotesk', sans-serif; font-size: 1.35rem; font-weight: 700; color: #00f0ff; letter-spacing: -0.02em;">
                     🕵️‍♂️ DATA DETECTIVE
                 </div>
-                <div style="font-size: 0.75rem; color: #94a3b8; font-family: 'Inter', sans-serif; margin-bottom: 0.5rem;">
-                    Classical ML Tabular Data Forensics
+                <div style="font-size: 0.75rem; color: #94a3b8; font-family: 'Inter', sans-serif; margin-bottom: 0.25rem;">
+                    Classical ML Tabular Forensics
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+
+        st.markdown("##### 🧭 Navigation Menu")
+        try:
+            st.page_link("app.py", label="About & Overview", icon="🏠")
+            st.page_link("pages/1_Run_Audit.py", label="Run Audit (Upload & Run)", icon="⚡")
+            st.page_link("pages/2_Audit_Dashboard.py", label="Audit Dashboard", icon="📊")
+            st.page_link("pages/3_Benchmark_Insights.py", label="Benchmark & Insights", icon="🔬")
+        except Exception:
+            pass
+
+        st.markdown("---")
 
 
 def get_cyber_plotly_layout(title: str = "", height: int = 380) -> Dict[str, Any]:

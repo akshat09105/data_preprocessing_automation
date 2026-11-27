@@ -12,6 +12,8 @@ Section Order:
 8. FOOTER
 """
 
+from pathlib import Path
+import pandas as pd
 import streamlit as st
 from utils_ui import load_cyber_theme, render_sidebar_branding
 
@@ -26,6 +28,17 @@ st.set_page_config(
 # Apply global dark cyber-detective theme
 load_cyber_theme()
 render_sidebar_branding()
+
+# Sidebar quick actions
+st.sidebar.markdown("##### ⚡ Quick Presets")
+demo_path = Path(__file__).resolve().parent / "data" / "demo_dataset_corrupted.csv"
+if demo_path.exists():
+    if st.sidebar.button("⚡ Load Demo & Go to Audit", type="primary", use_container_width=True):
+        st.session_state["df"] = pd.read_csv(demo_path)
+        st.session_state["dataset_name"] = "demo_dataset_corrupted.csv"
+        st.session_state["target_col"] = "survived"
+        st.session_state["id_col"] = "passenger_id"
+        st.switch_page("pages/1_Run_Audit.py")
 
 
 def main():
